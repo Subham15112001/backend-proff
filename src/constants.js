@@ -1,1 +1,1 @@
-export const DB_NAME = "firstDB"
+export const DB_NAME = "LEARN_MONGODB"
