@@ -23,6 +23,8 @@ const generateAccessTokenandRefreshToken = async (userId) => {
         throw new ApiError(500,"something went wrong when creating new refresh token and access token")
     }
 }
+
+//------------------
 const registerUser = asyncHandler(async (req,res,next) => {
     //get user data fron front end
     //validate the data
@@ -93,6 +95,7 @@ const registerUser = asyncHandler(async (req,res,next) => {
     )
 })
 
+//--------------------
 const loginUser = asyncHandler(async (req,res,next) => {
     // req body -> user data
     // username or email
@@ -107,15 +110,15 @@ const loginUser = asyncHandler(async (req,res,next) => {
         throw new ApiError(400,"send username or email")
     }
 
-    const user = User.findOne({
+    const user = await User.findOne({
         $or:[{email},{username}]
     })
 
     if(!user){
         throw new ApiError(404,"User does not exist")
     }
-
-    const isPasswordValid =  await user.isCorrectPassword(password);
+   
+    const isPasswordValid =  await user.isPasswordCorrect(password);
 
     if(!isPasswordValid){
         throw new ApiError(404,"password is incorrect")
@@ -142,4 +145,39 @@ const loginUser = asyncHandler(async (req,res,next) => {
                "user login successfully"
             ))
 })
-export {registerUser,loginUser}
+
+//-------------------------
+const logoutUser = asyncHandler(async (req,res,next) => {
+    await User.findByIdAndUpdate(
+        {_id:req.user._id},
+        {
+            $unset: {
+                refreshToken: 1 // this removes the field from document
+            }
+        },
+        {
+            new: true
+        }
+    )
+
+    const option = {
+        httpOnly:true,
+        secure:true
+    }
+
+    return res.status(200)
+              .clearCookie("accessToken",option)
+              .clearCookie("refreshToken",option)
+              .json(new ApiResponse(200,{},"user successfully logout"))
+})
+
+const refreshAccessToken = asyncHandler((req,res,next) => {
+    const incomingRefreshToken = req.cookie.refreshToken || req.body.refreshToken;
+
+    if(!incomingRefreshToken){
+        throw new ApiError(401,"Unauthorised request")
+    }
+
+    
+})
+export {registerUser,loginUser,logoutUser}
