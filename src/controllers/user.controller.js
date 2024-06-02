@@ -17,7 +17,7 @@ const generateAccessTokenandRefreshToken = async (userId) => {
 
         user.refreshToken = refreshToken; // insert refreshtoken
 
-        await user.save({ validateBeforeSave : false}); // validateBeforeSave : false important or else in current user 
+        await user.save({ validateBeforeSave : false}); // validateBeforeSave : false , important or else all info will ve needed in current user 
 
         return {accessToken,refreshToken};
 
@@ -176,7 +176,7 @@ const logoutUser = asyncHandler(async (req,res,next) => {
 // ---------------------------------
 const refreshAccessToken = asyncHandler( async (req,res,next) => {
    try {
-     const incomingRefreshToken = req.cookie.refreshToken || req.body.refreshToken;
+    const incomingRefreshToken = req?.cookie?.refreshToken || req.body?.refreshToken;
  
      if(!incomingRefreshToken){
          throw new ApiError(401,"Unauthorised request")
@@ -198,7 +198,8 @@ const refreshAccessToken = asyncHandler( async (req,res,next) => {
      }
  
      const {refreshToken,accessToken} = await generateAccessTokenandRefreshToken(user._id);
- 
+     console.log(refreshAccessToken);
+     console.log(accessToken);
      const option = {
          htmlOnly : true,
          secure: true
@@ -246,8 +247,8 @@ const updateAccoutDetails = asyncHandler(async (req,res,next) => {
     if(!fullname || !email){
         throw new ApiError(400,"all field are required")
     }
-
-    const user = User.findByIdAndUpdate(
+    //console.log(fullname,email)
+    const user = await User.findByIdAndUpdate(
         req.user._id,
         {
             $set:{
