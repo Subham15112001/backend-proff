@@ -172,12 +172,6 @@ const getVideoById = asyncHandler(async (req, res) => {
             }
         },
         {
-            $addFields : {
-                ownerDetails : "$ownerDetails" ,
-                likesDetails : "$likesDetails"
-            }
-        },
-        {
             $project : {
                 ownerDetails : 1,
                 likesDetails : 1,
