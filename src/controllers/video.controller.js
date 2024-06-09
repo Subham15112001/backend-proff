@@ -4,12 +4,66 @@ import {User} from "../models/user.model.js"
 import {ApiError} from "../utils/ApiError.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
-import {uploadOnCloudinary} from "../utils/cloudinary.js"
+import {uploadonCloudinary} from "../utils/cloudinary.js"
 
 
 const getAllVideos = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
-    //TODO: get all videos based on query, sort, pagination
+    //TODO: get all videos based on query, sort, 
+    if(sortType == asc){
+        sortType = 1;
+    }else{
+        sortType = -1;
+    }
+
+    if(!isValidObjectId(userId)){
+        throw new ApiError(400,"invalid user id")
+    }
+
+    const getResponse = await Video.aggregate([
+        {
+            $search : {
+                index:"search-videos",
+                text : {
+                    query:`${query}`,
+                    path : ["title","description"]
+                }
+            },
+            $match : {
+                owner : ObjectId(userId) 
+            },
+            $sort : {
+                [sortBy] : sortType
+            },
+            $lookup : {
+                from : "users",
+                localField : "owner",
+                foreignField : "_id",
+                as : "ownerVideos",
+                pipeline : [
+                    {
+                        $project : {
+                            username : 1,
+                            avatar : 1,
+                            fullname : 1,
+                            videoFile : 1,
+                            thumbnail : 1
+                        }
+                    }
+                ]
+            },           
+        },    
+        {
+            $unwind : "$ownerVideos"
+        },    
+    ])
+
+    if(!getResponse){
+        throw new ApiError(500,"failed to get videos")
+    }
+
+    return res.status(200)
+              .json(new ApiResponse(200,getResponse,"got all videos successfully"))
 })
 
 const publishAVideo = asyncHandler(async (req, res) => {
@@ -29,8 +83,8 @@ const publishAVideo = asyncHandler(async (req, res) => {
 
     const user = req.user;
 
-    const videoCloudinary = await uploadOnCloudinary(videoLocalPath);
-    const thumbnailCloudinary = await uploadOnCloudinary(thumbnailLocalPath);
+    const videoCloudinary = await uploadonCloudinary(videoLocalPath);
+    const thumbnailCloudinary = await uploadonCloudinary(thumbnailLocalPath);
 
     if(!videoCloudinaryPath || !thumbnailCloudinaryPath){
         throw new ApiError(400,"error in uploading files in cloudinary")
@@ -58,6 +112,10 @@ const publishAVideo = asyncHandler(async (req, res) => {
 const getVideoById = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     //TODO: get video by id
+    if(!isValidObjectId(videoId)){
+        throw new ApiError(400,"invalid video id")
+    }
+    const videoResponse = Video.findById(videoId)
 })
 
 const updateVideo = asyncHandler(async (req, res) => {

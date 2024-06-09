@@ -5,7 +5,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { uploadonCloudinary ,deleteCloudinary} from "../utils/cloudinary.js";
 import jwt from 'jsonwebtoken';
 import mongoose from "mongoose";
-
+import { ObjectId } from "mongodb";
 const generateAccessTokenandRefreshToken = async (userId) => {
     try {
         
@@ -406,7 +406,7 @@ const getWatchHistory = asyncHandler (async (req,res) => {
     const user = await User.aggregate([
         {
             $match : {
-                _id : new mongoose.Types.ObjectId(req.user._id)
+                _id :  ObjectId(req.user._id)
             }
         },
         {
