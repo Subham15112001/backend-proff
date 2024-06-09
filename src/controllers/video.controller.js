@@ -5,6 +5,7 @@ import {ApiError} from "../utils/ApiError.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
 import {uploadonCloudinary} from "../utils/cloudinary.js"
+import { Subscription } from "../models/subscription.model.js"
 
 
 const getAllVideos = asyncHandler(async (req, res) => {
@@ -110,12 +111,94 @@ const publishAVideo = asyncHandler(async (req, res) => {
 })
 
 const getVideoById = asyncHandler(async (req, res) => {
-    const { videoId } = req.params
+    const { videoId } = req.params;
+    const user = req.user;
     //TODO: get video by id
-    if(!isValidObjectId(videoId)){
+    if(!isValidObjectId(videoId) || !isValidObjectId(user._id)){
         throw new ApiError(400,"invalid video id")
     }
-    const videoResponse = Video.findById(videoId)
+
+  
+    // match video by id
+    // use loopup to get all the likes of the video and count the likes 
+    // use loopup to get all the owner of the video then add a pipeline to
+    // lookup on subscription schema to all subscriber
+    // create field username , issubscripted
+
+    const video = await Video.aggregate([
+        {
+            $match : {
+                _id : ObjectId(videoId)
+            }
+        },
+        {
+            $lookup : {
+                from : "users",
+                localField : "owner",
+                foreignField : " _id ",
+                as : "ownerDetails",
+                pipeline : [
+                    {
+                        $lookup : {
+                            from : "subscriptions",
+                            localField : "channel",
+                            foreignField : "owner",
+                            as : "subscribers"
+                        },
+                        $addFields : {
+                            subscriberCount : {
+                                $size : "$subscribers"
+                            },
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            $lookup : {
+                from : "likes",
+                localField : "_id",
+                foreignField : "video",
+                as : "likesDetails",
+                pipeline : [
+                    {
+                        $addFields: {
+                            $likesCount: {
+                                $size: "$likesDetails"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            $addFields : {
+                ownerDetails : "$ownerDetails" ,
+                likesDetails : "$likesDetails"
+            }
+        },
+        {
+            $project : {
+                ownerDetails : 1,
+                likesDetails : 1,
+                username : 1,
+                title: 1,
+                description: 1,
+                views: 1,
+                createdAt: 1,
+                duration: 1,
+                videoFile : 1,
+
+            }
+        }
+    ])
+
+    if(!video){
+        throw new ApiError(500,"error in fetching video by id")
+    }
+
+    return res.status(200)
+              .json(new ApiResponse(200,video,"video fetch successfully"))
 })
 
 const updateVideo = asyncHandler(async (req, res) => {
