@@ -4,8 +4,10 @@ import {User} from "../models/user.model.js"
 import {ApiError} from "../utils/ApiError.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
-import {uploadonCloudinary} from "../utils/cloudinary.js"
+import {deleteCloudinary, uploadonCloudinary} from "../utils/cloudinary.js"
 import { Subscription } from "../models/subscription.model.js"
+import { Comment } from "../models/comment.model.js"
+import { Like } from "../models/like.model.js"
 
 
 const getAllVideos = asyncHandler(async (req, res) => {
@@ -20,7 +22,9 @@ const getAllVideos = asyncHandler(async (req, res) => {
     if(!isValidObjectId(userId)){
         throw new ApiError(400,"invalid user id")
     }
-
+    
+    // search for text , written in query
+    // lookup with user to get details of owner
     const getResponse = await Video.aggregate([
         {
             $search : {
@@ -63,8 +67,15 @@ const getAllVideos = asyncHandler(async (req, res) => {
         throw new ApiError(500,"failed to get videos")
     }
 
+    const option = {
+        page : parseInt(page,10),
+        limit : parseInt(limit,10) // base 10
+    }
+
+    const video = await  Video.aggregatePaginate(getResponse,option);
+
     return res.status(200)
-              .json(new ApiResponse(200,getResponse,"got all videos successfully"))
+              .json(new ApiResponse(200,video,"got all videos successfully"))
 })
 
 const publishAVideo = asyncHandler(async (req, res) => {
@@ -182,7 +193,6 @@ const getVideoById = asyncHandler(async (req, res) => {
                 createdAt: 1,
                 duration: 1,
                 videoFile : 1,
-
             }
         }
     ])
@@ -198,12 +208,89 @@ const getVideoById = asyncHandler(async (req, res) => {
 const updateVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     //TODO: update video details like title, description, thumbnail
+    const {title,description} = req.body;
+    const user = req.user;
 
+    
+    const video = await Video.findById(videoId);
+
+    if(!video){
+        throw new ApiError(400,"video not found")
+    }
+
+    if(user?._id.toString() !== video.owner.toString()){
+        throw new ApiError(400,"you are not the owner of the video")
+    }
+
+    if(!title || !description ){
+        throw new ApiError(400,"title , thumbnail and description all are required")
+    }
+
+    const thumbnailLocalFilePath = req.files?.path;
+    const oldThumbnailUrl = video.thumbnail;
+
+    if(!thumbnailLocalFilePath){
+        throw new ApiError(400,"thumbnail file is required")
+    }
+
+    const thumbnailCloudinaryUrl = await uploadonCloudinary(thumbnailLocalFilePath);
+
+    if(!thumbnailCloudinaryUrl){
+        throw new ApiError(500,"uploading in cloudinary fail , tru again")
+    }
+
+    const videoUpdate = await Video.findByIdAndUpdate(videoId,
+        {
+            $set : {
+                thumbnail : thumbnailCloudinaryUrl.url,
+                description,
+                title
+            }
+        }
+    )
+    
+    if(!videoUpdate){
+        throw new ApiError(500,"failed to update")
+    }
+
+    if(videoUpdate){
+        await deleteCloudinary(oldThumbnailUrl)
+    }
+
+    return res.status(200)
+              .json(new ApiResponse(200,videoUpdate,"video updated successfully"))
 })
 
 const deleteVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     //TODO: delete video
+    if(!isValidObjectId(videoId)){
+        throw new ApiError(400,"video id invalid")
+    }
+
+    const video = await Video.findById(videoId);
+
+    if(!video){
+        throw new ApiError(500,"error in fetching video data")
+    }
+
+    if(video?.owner.toString() !== req.user?._id.toString()){
+        throw new ApiError(400,"the current user is not the owner")
+    }
+
+    const deleteVideo = await Video.findByIdAndDelete(videoId);
+    const deleteComment = await Comment.deleteMany({video : videoId});
+    const deleteLike = await Like.deleteMany({video : videoId});
+
+    if(deleteVideo){
+        await deleteCloudinary(video.videoFile)
+        await deleteCloudinary(video.thumbnail)
+    }else{
+        throw new ApiError(500,"error in deleting video")
+    }
+
+    return res.status(200)
+              .json(new ApiResponse(200,{deleteComment,deleteLike,deleteVideo},"video deleted successfully"))
 })
 
 const togglePublishStatus = asyncHandler(async (req, res) => {

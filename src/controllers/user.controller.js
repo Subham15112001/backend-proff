@@ -4,7 +4,7 @@ import { User } from "../models/user.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { uploadonCloudinary ,deleteCloudinary} from "../utils/cloudinary.js";
 import jwt from 'jsonwebtoken';
-import mongoose from "mongoose";
+import mongoose,{isValidObjectId} from "mongoose";
 import { ObjectId } from "mongodb";
 const generateAccessTokenandRefreshToken = async (userId) => {
     try {
@@ -198,8 +198,7 @@ const refreshAccessToken = asyncHandler( async (req,res,next) => {
      }
  
      const {refreshToken,accessToken} = await generateAccessTokenandRefreshToken(user._id);
-     console.log(refreshAccessToken);
-     console.log(accessToken);
+   
      const option = {
          htmlOnly : true,
          secure: true
