@@ -9,11 +9,20 @@ const getVideoComments = asyncHandler(async (req, res) => {
     //TODO: get all comments for a video
     // http://localhost:8000/api/v1/comments/:videoId?page=1&limit=10
 
-    const {videoId} = req.params
-    const {page = 1, limit = 10} = req.query
-    
+    const {videoId} = req.params;
+    const {page = 1, limit = 10} = req.query;
 
+    if(!isValidObjectId(videoId)){
+        throw new ApiError(400,"video id is invalid")
+    }
 
+    const fetchComments = await Comment.aggregate([
+        {
+            $match:{
+                
+            }
+        }
+    ])
 })
 
 const addComment = asyncHandler(async (req, res) => {
