@@ -19,7 +19,13 @@ const getVideoComments = asyncHandler(async (req, res) => {
     const fetchComments = await Comment.aggregate([
         {
             $match:{
-                
+                video : Object(videoId)
+            }
+        },
+        {
+            $lookup : {
+                from : "users",
+                localField : ""
             }
         }
     ])
