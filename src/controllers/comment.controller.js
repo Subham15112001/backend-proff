@@ -3,6 +3,8 @@ import {Comment} from "../models/comment.model.js"
 import {ApiError} from "../utils/ApiError.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
+import { User } from "../models/user.model.js"
+import { Like } from "../models/like.model.js"
 
 
 const getVideoComments = asyncHandler(async (req, res) => {
@@ -135,10 +137,69 @@ const addComment = asyncHandler(async (req, res) => {
 
 const updateComment = asyncHandler(async (req, res) => {
     // TODO: update a comment
+    const {commentId} = req.params;
+    const {content} = req.body;
+    const userId = req?.user?._id;
+
+    if(!isValidObjectId(commentId) || !isValidObjectId(userId)){
+        throw new ApiError(400,"invalid id")
+    }
+
+    const oldComment = await Comment.findById(commentId);
+
+    if(!oldComment){
+        throw new ApiError(500,"error in fetching old comment")
+    }
+
+    if(userId.toString() !== oldComment.owner?.toString()){
+        throw new ApiError(400,"you are not the owner")
+    }
+
+    const newComment = await Comment.findByIdAndUpdate(commentId,
+        {
+            "content" : content
+        },
+        {
+            new:true
+        }
+    )
+
+    if(!newComment){
+        throw new ApiError(500,"error in updating comment")
+    }
+
+    return res.status(200)
+              .json(new ApiResponse(200,newComment,"comment updated successfully"))
+
 })
 
 const deleteComment = asyncHandler(async (req, res) => {
     // TODO: delete a comment
+    const {commentId} = req.params;
+    const userId = req.user?._id;
+
+    const comment = await Comment.findById(commentId);
+
+    if(comment.owner?.toString() !== userId){
+        throw new ApiError(400,"user is not the owner")
+    }
+
+    const deleteResponse = await Comment.findByIdAndDelete(commentId);
+
+    if(!deleteResponse){
+        throw new ApiError(500,"error in deleting comment")
+    }
+
+    const deleteLikes = await Like.deleteMany({
+        comment : commentId
+    })
+
+    if(!deleteLikes){
+        throw new ApiError(500,"unable to delete likes")
+    }
+    return res.status(200)
+              .json(new ApiResponse(500,deleteResponse,"deleted comment and associated likes successfully"))
+
 })
 
 export {
