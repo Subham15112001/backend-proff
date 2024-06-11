@@ -15,7 +15,17 @@ const getVideoComments = asyncHandler(async (req, res) => {
     if(!isValidObjectId(videoId)){
         throw new ApiError(400,"video id is invalid")
     }
-
+    // $project: {
+    //     content: 1,
+    //     createdAt: 1,
+    //     likesCount: 1,
+    //     owner: {
+    //         username: 1,
+    //         fullName: 1,
+    //         "avatar.url": 1
+    //     },
+    //     isLiked: 1
+    // }
     const fetchComments = await Comment.aggregate([
         {
             $match:{
@@ -25,10 +35,77 @@ const getVideoComments = asyncHandler(async (req, res) => {
         {
             $lookup : {
                 from : "users",
-                localField : ""
+                localField : "owner",
+                foreignField : "_id",
+                as : "ownerDetails"
+            }
+        },
+        {
+            $lookup : {
+                from : "likes",
+                localField : "_id",
+                foreignField : "comment",
+                as : "likeDetails",
+                pipeline : [
+                    {
+                        $addFields : {
+                            likeCount : {
+                                $size : "$likeDetails"
+                            },
+                            ownerDetails : {
+                                $first : "$ownerDetails"
+                            },
+                            isLiked : {
+                                $cond : {
+                                    $if : {
+                                        $in : [req?.user?._id,"$likeDetails.likedBy"]
+                                    },
+                                    then : true,
+                                    else : false
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            $sort : {
+                createdAt : -1
+            }
+        },
+        {
+            $project : {
+                content : 1,
+                createdAt : 1,
+                ownerDetails : {
+                    username : 1,
+                    fullname : 1,
+                    email : 1,
+                    avatar : 1
+                },
+                likeCount : 1,
+                isLiked : 1,
             }
         }
     ])
+
+    const option = {
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10)
+    }
+
+    const comment = await Comment.aggregatePaginate(
+        fetchComments,
+        option
+    )
+
+    if(!comment){
+        throw new ApiError(500,"unable to fetch comments")
+    }
+
+    return res.status(200)
+              .json(new ApiResponse(200,comment,"comments fetch successfully"))
 })
 
 const addComment = asyncHandler(async (req, res) => {
