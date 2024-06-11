@@ -44,17 +44,65 @@ const toggleVideoLike = asyncHandler(async (req, res) => {
 const toggleCommentLike = asyncHandler(async (req, res) => {
     const {commentId} = req.params
     //TODO: toggle like on comment
+    if(!isValidObjectId(commentId)){
+        throw new ApiError(400,"invalid comment id")
+    }
 
+    const likeExist = await Like.findOne({
+        $and : [
+            {
+                comment :commentId
+            },
+            {
+                likedBy : req.user?._id
+            }
+        ]
+    })
+
+    if(likeExist){
+        const like = await Like.findOneAndDelete(
+            {
+                $and : [
+                    {
+                        comment :commentId
+                    },
+                    {
+                        likedBy : req.user?._id
+                    }
+                ]
+            }
+        )
+
+        if(!like){
+            throw new ApiError(500,"unable to delete like")
+        }
+
+        return res.status(200)
+                  .json(new ApiResponse(200,like,"like deleted successfully"))
+    }
+
+    const createLike = await Like.create({
+        comment : commentId,
+        likedBy : req.user?._id
+    })
+    
+    if(!createLike){
+        throw new ApiError(500,"unable to create like try again")
+    }
+
+    return res.status(200)
+              .json(new ApiResponse(200,createLike,"liked created successfully"))
+    
 })
 
 const toggleTweetLike = asyncHandler(async (req, res) => {
     const {tweetId} = req.params
     //TODO: toggle like on tweet
-}
-)
+})
 
 const getLikedVideos = asyncHandler(async (req, res) => {
     //TODO: get all liked videos
+    
 })
 
 export {
